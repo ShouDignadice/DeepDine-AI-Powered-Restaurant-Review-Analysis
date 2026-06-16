@@ -36,7 +36,7 @@ def main() -> None:
 
     # Remove duplicate review text.
     reviews = reviews.drop_duplicates(
-        subset=["text"]
+        subset=["business_id", "text"]
     )
 
     # Remove reviews that are too short to provide useful context.

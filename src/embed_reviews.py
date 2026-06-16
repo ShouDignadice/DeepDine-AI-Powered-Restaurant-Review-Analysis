@@ -12,7 +12,7 @@ INPUT_FILE = (
 )
 
 EMBEDDINGS_FILE = (
-    DATA_DIR / "processed" / "review_embeddings.npy"
+    DATA_DIR / "embeddings" / "review_embeddings.npy"
 )
 
 MODEL_NAME = "all-MiniLM-L6-v2"

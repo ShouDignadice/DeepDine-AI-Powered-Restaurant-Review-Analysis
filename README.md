@@ -23,7 +23,7 @@ Run the scripts from the project root in this order:
 python src/prep_yelp_data.py
 python src/clean_yelp_reviews.py
 python src/embed_reviews.py
-python src/cluster_reviews.py
+python src/classify_reviews.py
 python src/label_clusters.py
 python src/summarize_restaurants.py
 ```
