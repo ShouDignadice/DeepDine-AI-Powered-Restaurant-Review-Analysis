@@ -1,82 +1,47 @@
-# DeepDine: AI-Powered Restaurant Review Analysis
+## Review Classification
 
-DeepDine is an NLP project that analyzes Yelp restaurant reviews to identify recurring customer experiences and create restaurant-level theme summaries.
+DeepDine uses sentence embeddings to classify restaurant reviews into predefined operational themes. Unlike K-Means clustering, each category has a consistent business meaning across restaurants.
 
-## Process
+### Predefined Themes
 
-The project uses approximately **20,000 reviews from 2,000 restaurants**, with up to 10 reviews sampled per restaurant.
+* **Food Quality** — taste, freshness, temperature, preparation, portions, and presentation
+* **Service** — friendliness, attentiveness, professionalism, and communication
+* **Wait Time** — seating delays, slow service, delayed food, and delivery time
+* **Cleanliness** — tables, bathrooms, utensils, dining areas, and hygiene
+* **Price and Value** — affordability, portion value, discounts, and unexpected charges
+* **Order Accuracy** — incorrect orders, missing items, substitutions, and special requests
+* **Atmosphere** — noise, seating, music, comfort, parking, and crowding
 
-The analysis follows this process:
+Reviews with weak or overlapping theme matches are classified as **Other / Mixed**.
 
-1. Filter the Yelp dataset to restaurant businesses.
-2. Sample reviews across different restaurants.
-3. Remove missing, duplicate, and extremely short reviews.
-4. Generate semantic embeddings using `all-MiniLM-L6-v2`.
-5. Group similar reviews using K-Means clustering.
-6. Review representative examples from each cluster.
-7. Assign readable labels to the discovered themes.
-8. Summarize theme frequency and average ratings for each restaurant.
+Reviews are also separated by rating:
 
-Run the scripts from the project root in this order:
+* **Negative:** 1–3 stars
+* **Positive:** 4–5 stars
 
-```bash
-python src/prep_yelp_data.py
-python src/clean_yelp_reviews.py
-python src/embed_reviews.py
-python src/classify_reviews.py
-python src/label_clusters.py
-python src/summarize_restaurants.py
-```
+## Sample Finding
 
-## Current Outcome
+During the initial multi-restaurant test, DeepDine analyzed 99 usable reviews for Oishii Poké.
 
-Each review is converted into a **384-dimensional embedding** and assigned to one of **12 clusters**.
+### Top Positive Recurring Theme
 
-The current clustering baseline identified themes related to:
+Food Quality was the strongest positive recurring theme, appearing in 56 of the restaurant’s 78 positive reviews, or 71.79%. This indicates that customers frequently associate Oishii Poké with favorable food experiences, making food quality the restaurant’s primary recurring strength.
 
-* Poor service and delayed food
-* Extreme wait times and unfulfilled orders
-* Excellent overall dining experiences
-* Good food with inconsistent service
-* Bars, drinks, and atmosphere
-* Pizza, Mexican, Chinese, Thai, sushi, café, and bakery experiences
+### Top Negative Recurring Theme
 
-The final restaurant summary contains:
+Food Quality was also the most common theme among negative feedback, appearing in 13 of 21 negative reviews, or 61.90%. However, these 13 reviews represent a much smaller portion of the restaurant’s total Food Quality feedback than the 56 positive reviews.
 
-```text
-business_id
-name
-cluster_label
-review_count
-average_stars
-total_reviews
-theme_percentage
-```
+Overall, the results suggest that food is the primary reason customers discuss Oishii Poké and is generally viewed as a major strength. The smaller group of negative Food Quality reviews can be inspected separately to identify specific concerns involving preparation, taste, temperature, portions, or individual menu items.
 
-This allows the project to show which themes appear most often for each restaurant and how customers rated reviews associated with those themes.
+## Project Direction
 
-## Current Limitation
+The multi-restaurant Yelp dataset is used for initial testing and validation. DeepDine’s primary goal is to analyze one restaurant at a time using approximately 50–100 or more reviews.
 
-The model clusters complete reviews.
+For each restaurant, the system will provide:
 
-A review such as:
+* Recurring strengths and issues
+* Theme counts and percentages
+* Classification confidence scores
+* Representative supporting reviews
+* Evidence-backed improvement recommendations
 
-```text
-"The service was slow, but the food was excellent."
-```
-
-contains both negative and positive feedback, but K-Means assigns the full review to only one cluster.
-
-The current results should therefore be treated as a baseline and as sample-based insights rather than definitive restaurant evaluations.
-
-## Future Improvements
-
-Planned improvements include:
-
-* Compare 12, 16, and 20 clusters
-* Test stronger embedding models
-* Separate topic detection from sentiment analysis
-* Split multi-topic reviews into shorter segments
-* Add semantic search and a vector database
-* Use OpenAI to generate evidence-backed recommendations
-* Build an interactive Streamlit dashboard
