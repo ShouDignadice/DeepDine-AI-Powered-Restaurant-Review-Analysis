@@ -1,49 +1,55 @@
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = PROJECT_ROOT / "data"
-
-INPUT_FILE = (
-    DATA_DIR / "processed" / "cleaned_yelp_reviews.csv"
-)
-
-EMBEDDINGS_FILE = (
-    DATA_DIR / "embeddings" / "review_embeddings.npy"
-)
 
 MODEL_NAME = "all-MiniLM-L6-v2"
 BATCH_SIZE = 64
 
 
-def main() -> None:
-    reviews = pd.read_csv(INPUT_FILE)
+def validate_reviews(reviews: pd.DataFrame) -> None:
+    """Validate that reviews are ready to be embedded."""
 
-    print(f"Reviews loaded: {len(reviews):,}")
-    print(f"Loading embedding model: {MODEL_NAME}")
+    if "text" not in reviews.columns:
+        raise ValueError(
+            "The cleaned review data must contain a text column. "
+            "Run clean_restaurant_reviews.py first."
+        )
 
-    model = SentenceTransformer(MODEL_NAME)
+    if reviews.empty:
+        raise ValueError(
+            "The cleaned review data does not contain any reviews."
+        )
+
+
+def create_review_embeddings(
+    reviews: pd.DataFrame,
+    model_name: str = MODEL_NAME,
+    batch_size: int = BATCH_SIZE,
+) -> np.ndarray:
+    """Convert review text into normalized sentence embeddings."""
+
+    validate_reviews(reviews)
+
+    print(f"Loading review embedding model: {model_name}")
+
+    model = SentenceTransformer(model_name)
 
     embeddings = model.encode(
         reviews["text"].tolist(),
-        batch_size=BATCH_SIZE,
+        batch_size=batch_size,
         show_progress_bar=True,
         convert_to_numpy=True,
         normalize_embeddings=True,
     )
 
-    np.save(
-        EMBEDDINGS_FILE,
-        embeddings,
-    )
-
-    print("\nEmbedding generation complete.")
+    print("Review embedding step complete.")
     print(f"Embedding shape: {embeddings.shape}")
-    print(f"Embeddings saved to: {EMBEDDINGS_FILE}")
 
+    return embeddings
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(
+        "embed_reviews.py is now a helper module. "
+        "Run python src/main.py to execute the full DeepDine pipeline."
+    )

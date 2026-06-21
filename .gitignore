@@ -1,3 +1,4 @@
+```gitignore
 # Python cache files
 __pycache__/
 *.py[cod]
@@ -22,19 +23,28 @@ Thumbs.db
 .env.*
 *.key
 
-# Raw Yelp datasets
+# Raw and input datasets
 data/raw/
+data/input/
 
-# Generated datasets
-data/processed/*.csv
+# Generated processed outputs
+data/processed/
 
 # Generated embeddings
-data/embeddings/*.npy
+data/embeddings/
+
+# Keep empty data folders if .gitkeep files are used
+!data/
+!data/input/.gitkeep
+!data/processed/.gitkeep
+!data/raw/.gitkeep
+!data/embeddings/.gitkeep
 
 # Model and library caches
 .cache/
 huggingface/
 sentence_transformers/
+models/
 
 # Logs
 *.log
@@ -51,3 +61,4 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+```

@@ -8,33 +8,14 @@ from sentence_transformers import SentenceTransformer
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 
-REVIEWS_FILE = (
-    DATA_DIR / "processed" / "cleaned_yelp_reviews.csv"
-)
-
-EMBEDDINGS_FILE = (
-    DATA_DIR / "embeddings" / "review_embeddings.npy"
-)
-
-THEMED_REVIEWS_FILE = (
-    DATA_DIR / "processed" / "themed_yelp_reviews.csv"
-)
-
-THEME_EXAMPLES_FILE = (
-    DATA_DIR / "processed" / "theme_examples.csv"
-)
-
+CLEANED_REVIEWS_FILE = DATA_DIR / "processed" / "cleaned_restaurant_reviews.csv"
+SORTED_THEMED_REVIEWS_FILE = DATA_DIR / "processed" / "sorted_themed_restaurant_reviews.csv"
+FINAL_ANALYSIS_FILE = DATA_DIR / "processed" / "final_analysis.csv"
 
 MODEL_NAME = "all-MiniLM-L6-v2"
 
-EXAMPLES_PER_THEME = 5
-
-# Minimum similarity between a review and its best theme.
 MIN_THEME_SCORE = 0.30
-
-# Minimum difference between the best and second-best themes.
 MIN_SCORE_MARGIN = 0.03
-
 
 THEMES = {
     "Food Quality": (
@@ -72,7 +53,7 @@ def validate_data(
     reviews: pd.DataFrame,
     embeddings: np.ndarray,
 ) -> None:
-    """Validate that the review data and embeddings match."""
+    """Validate that the cleaned reviews and embeddings match."""
 
     required_columns = {
         "review_id",
@@ -86,36 +67,42 @@ def validate_data(
 
     if missing_columns:
         raise ValueError(
-            "The reviews file is missing required columns: "
-            f"{sorted(missing_columns)}"
+            "The cleaned review data is missing required columns: "
+            f"{sorted(missing_columns)}. Run clean_restaurant_reviews.py first."
+        )
+
+    if reviews.empty:
+        raise ValueError(
+            "The cleaned review data does not contain any reviews."
         )
 
     if len(reviews) != len(embeddings):
         raise ValueError(
-            "The number of reviews does not match the number of embeddings. "
-            "Run embed_reviews.py again using the current cleaned review file."
+            "The number of cleaned reviews does not match the number of "
+            "review embeddings. Re-run the full pipeline from main.py."
         )
 
     if embeddings.ndim != 2:
         raise ValueError(
-            "The embeddings file must contain a two-dimensional array."
-        )
-
-    if len(reviews) == 0:
-        raise ValueError(
-            "The cleaned reviews file does not contain any reviews."
+            "The review embeddings must be a two-dimensional array."
         )
 
 
 def classify_reviews(
     reviews: pd.DataFrame,
     review_embeddings: np.ndarray,
+    model_name: str = MODEL_NAME,
 ) -> pd.DataFrame:
-    """Assign each review to the closest predefined theme."""
+    """Assign each review to the closest predefined primary and secondary theme."""
 
-    print(f"Loading theme embedding model: {MODEL_NAME}")
+    validate_data(
+        reviews=reviews,
+        embeddings=review_embeddings,
+    )
 
-    model = SentenceTransformer(MODEL_NAME)
+    print(f"Loading theme embedding model: {model_name}")
+
+    model = SentenceTransformer(model_name)
 
     theme_names = list(THEMES.keys())
     theme_descriptions = list(THEMES.values())
@@ -130,21 +117,18 @@ def classify_reviews(
     if review_embeddings.shape[1] != theme_embeddings.shape[1]:
         raise ValueError(
             "The review embeddings and theme embeddings have different "
-            "dimensions. Confirm that embed_reviews.py and classify_reviews.py "
-            f"both use the model '{MODEL_NAME}'."
+            f"dimensions. Confirm that both steps use '{model_name}'."
         )
 
-    # The review embeddings and theme embeddings are normalized.
-    # Their dot product is therefore equivalent to cosine similarity.
     similarity_scores = review_embeddings @ theme_embeddings.T
 
     ranked_theme_indices = np.argsort(
         similarity_scores,
         axis=1,
-    )
+    )[:, ::-1]
 
-    primary_indices = ranked_theme_indices[:, -1]
-    secondary_indices = ranked_theme_indices[:, -2]
+    primary_indices = ranked_theme_indices[:, 0]
+    secondary_indices = ranked_theme_indices[:, 1]
 
     row_indices = np.arange(len(reviews))
 
@@ -157,8 +141,6 @@ def classify_reviews(
         row_indices,
         secondary_indices,
     ]
-
-    score_margins = primary_scores - secondary_scores
 
     classified_reviews = reviews.copy()
 
@@ -173,46 +155,26 @@ def classify_reviews(
     ]
 
     classified_reviews["theme_score"] = primary_scores
+    classified_reviews["secondary_theme_score"] = secondary_scores
+    classified_reviews["score_margin"] = primary_scores - secondary_scores
 
-    classified_reviews["secondary_theme_score"] = (
-        secondary_scores
-    )
-
-    classified_reviews["score_margin"] = score_margins
-
-    # Begin with the best-matching theme.
-    classified_reviews["theme"] = (
-        classified_reviews["primary_theme"]
-    )
-
-    # Mark reviews as uncertain when:
-    # 1. The best theme score is too low, or
-    # 2. The best and second-best themes are too similar.
     classified_reviews["is_uncertain"] = (
-        (
-            classified_reviews["theme_score"]
-            < MIN_THEME_SCORE
-        )
-        |
-        (
-            classified_reviews["score_margin"]
-            < MIN_SCORE_MARGIN
-        )
+        (classified_reviews["theme_score"] < MIN_THEME_SCORE)
+        | (classified_reviews["score_margin"] < MIN_SCORE_MARGIN)
     )
 
-    classified_reviews.loc[
+    classified_reviews["theme_note"] = np.where(
         classified_reviews["is_uncertain"],
-        "theme",
-    ] = "Other / Mixed"
+        "Review also closely matched the secondary theme",
+        "Clear primary theme",
+    )
 
-    # Separate low-rated issues from high-rated strengths.
     classified_reviews["review_group"] = np.where(
         classified_reviews["stars"] <= 3,
         "Negative",
         "Positive",
     )
 
-    # Round values for cleaner CSV output.
     score_columns = [
         "theme_score",
         "secondary_theme_score",
@@ -226,86 +188,125 @@ def classify_reviews(
     return classified_reviews
 
 
-def create_theme_examples(
-    reviews: pd.DataFrame,
-) -> pd.DataFrame:
-    """Select representative reviews for manual theme inspection."""
+def sort_classified_reviews(reviews: pd.DataFrame) -> pd.DataFrame:
+    """Sort reviews so negative feedback and related themes are easier to inspect."""
 
-    examples = []
+    group_order = {
+        "Negative": 0,
+        "Positive": 1,
+    }
 
-    theme_order = list(THEMES.keys()) + ["Other / Mixed"]
+    sorted_reviews = reviews.copy()
+    sorted_reviews["review_group_order"] = (
+        sorted_reviews["review_group"].map(group_order).fillna(2)
+    )
 
-    for theme in theme_order:
-        theme_reviews = reviews.loc[
-            reviews["theme"] == theme
-        ].copy()
+    sorted_reviews = sorted_reviews.sort_values(
+        by=[
+            "business_id",
+            "review_group_order",
+            "primary_theme",
+            "stars",
+            "theme_score",
+        ],
+        ascending=[
+            True,
+            True,
+            True,
+            True,
+            False,
+        ],
+    ).drop(columns=["review_group_order"])
 
-        if theme_reviews.empty:
-            continue
+    return sorted_reviews.reset_index(drop=True)
 
-        if theme == "Other / Mixed":
-            # Reviews with the smallest margins are the most mixed.
-            theme_reviews = theme_reviews.sort_values(
-                by=[
-                    "score_margin",
-                    "theme_score",
-                ],
-                ascending=[
-                    True,
-                    False,
-                ],
-            )
-        else:
-            # Higher similarity scores are more representative.
-            theme_reviews = theme_reviews.sort_values(
-                by="theme_score",
-                ascending=False,
-            )
 
-        selected_reviews = theme_reviews.head(
-            EXAMPLES_PER_THEME
+def create_final_analysis_file(reviews: pd.DataFrame) -> pd.DataFrame:
+    """Create the simplified CSV used for manual restaurant review analysis."""
+
+    final_analysis = reviews.rename(
+        columns={
+            "name": "business_name",
+        }
+    ).copy()
+
+    analysis_columns = [
+        "business_id",
+        "business_name",
+        "review_id",
+        "stars",
+        "review_group",
+        "primary_theme",
+        "secondary_theme",
+        "text",
+    ]
+
+    missing_columns = [
+        column
+        for column in analysis_columns
+        if column not in final_analysis.columns
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            "Cannot create final_analysis.csv because these columns are missing: "
+            f"{missing_columns}"
         )
 
-        for rank, (_, review) in enumerate(
-            selected_reviews.iterrows(),
-            start=1,
-        ):
-            examples.append(
-                {
-                    "theme": theme,
-                    "rank": rank,
-                    "review_id": review["review_id"],
-                    "business_id": review["business_id"],
-                    "name": review["name"],
-                    "stars": review["stars"],
-                    "review_group": review["review_group"],
-                    "primary_theme": review["primary_theme"],
-                    "theme_score": review["theme_score"],
-                    "secondary_theme": review[
-                        "secondary_theme"
-                    ],
-                    "secondary_theme_score": review[
-                        "secondary_theme_score"
-                    ],
-                    "score_margin": review["score_margin"],
-                    "text": review["text"],
-                }
-            )
+    final_analysis = final_analysis[analysis_columns]
 
-    return pd.DataFrame(examples)
+    final_analysis = final_analysis.sort_values(
+        by=[
+            "business_id",
+            "review_group",
+            "primary_theme",
+            "stars",
+            "review_id",
+        ],
+        ascending=[
+            True,
+            True,
+            True,
+            True,
+            True,
+        ],
+    ).reset_index(drop=True)
+
+    return final_analysis
 
 
-def print_theme_summary(
-    reviews: pd.DataFrame,
+def save_classification_outputs(
+    sorted_reviews: pd.DataFrame,
+    final_analysis: pd.DataFrame,
+    sorted_output_file: Path = SORTED_THEMED_REVIEWS_FILE,
+    final_analysis_file: Path = FINAL_ANALYSIS_FILE,
 ) -> None:
-    """Display the classification results in the terminal."""
+    """Save only the two classification analysis CSV outputs."""
+
+    sorted_output_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    sorted_reviews.to_csv(
+        sorted_output_file,
+        index=False,
+    )
+
+    final_analysis.to_csv(
+        final_analysis_file,
+        index=False,
+    )
+
+def print_theme_summary(reviews: pd.DataFrame) -> None:
+    """Print a short terminal summary without creating another CSV."""
 
     print("\nReviews per theme:")
 
     theme_counts = (
-        reviews["theme"]
+        reviews["primary_theme"]
         .value_counts()
-        .rename_axis("theme")
+        .rename_axis("primary_theme")
         .reset_index(name="review_count")
     )
 
@@ -321,96 +322,11 @@ def print_theme_summary(
         )
     )
 
-    uncertain_count = int(
-        reviews["is_uncertain"].sum()
-    )
-
-    uncertain_percentage = (
-        uncertain_count
-        / len(reviews)
-        * 100
-    )
-
-    print(
-        "\nUncertain or mixed reviews: "
-        f"{uncertain_count:,} "
-        f"({uncertain_percentage:.2f}%)"
-    )
-
     print("\nReviews by theme and rating group:")
 
     grouped_counts = pd.crosstab(
-        reviews["theme"],
+        reviews["primary_theme"],
         reviews["review_group"],
     )
 
     print(grouped_counts)
-
-
-def main() -> None:
-    THEMED_REVIEWS_FILE.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    reviews = pd.read_csv(
-        REVIEWS_FILE,
-    )
-
-    review_embeddings = np.load(
-        EMBEDDINGS_FILE,
-    )
-
-    validate_data(
-        reviews=reviews,
-        embeddings=review_embeddings,
-    )
-
-    print(f"Reviews loaded: {len(reviews):,}")
-    print(
-        "Embedding shape: "
-        f"{review_embeddings.shape}"
-    )
-    print(
-        "Predefined themes: "
-        f"{len(THEMES)}"
-    )
-
-    classified_reviews = classify_reviews(
-        reviews=reviews,
-        review_embeddings=review_embeddings,
-    )
-
-    theme_examples = create_theme_examples(
-        classified_reviews,
-    )
-
-    classified_reviews.to_csv(
-        THEMED_REVIEWS_FILE,
-        index=False,
-    )
-
-    theme_examples.to_csv(
-        THEME_EXAMPLES_FILE,
-        index=False,
-    )
-
-    print_theme_summary(
-        classified_reviews,
-    )
-
-    print("\nTheme classification complete.")
-
-    print(
-        "Themed reviews saved to: "
-        f"{THEMED_REVIEWS_FILE}"
-    )
-
-    print(
-        "Theme examples saved to: "
-        f"{THEME_EXAMPLES_FILE}"
-    )
-
-
-if __name__ == "__main__":
-    main()
