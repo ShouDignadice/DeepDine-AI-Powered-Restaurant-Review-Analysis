@@ -1,47 +1,52 @@
-## Review Classification
+# DeepDine: AI-Powered Restaurant Review Analysis
 
-DeepDine uses sentence embeddings to classify restaurant reviews into predefined operational themes. Unlike K-Means clustering, each category has a consistent business meaning across restaurants.
+DeepDine is an NLP project that turns restaurant reviews into structured customer-feedback insights.
 
-### Predefined Themes
+The project analyzes one restaurant at a time by cleaning review data, generating sentence embeddings, and classifying each review into predefined themes such as Food Quality, Service, Wait Time, Cleanliness, Price and Value, Order Accuracy, and Atmosphere.
 
-* **Food Quality** — taste, freshness, temperature, preparation, portions, and presentation
-* **Service** — friendliness, attentiveness, professionalism, and communication
-* **Wait Time** — seating delays, slow service, delayed food, and delivery time
-* **Cleanliness** — tables, bathrooms, utensils, dining areas, and hygiene
-* **Price and Value** — affordability, portion value, discounts, and unexpected charges
-* **Order Accuracy** — incorrect orders, missing items, substitutions, and special requests
-* **Atmosphere** — noise, seating, music, comfort, parking, and crowding
+## Project Goal
 
-Reviews with weak or overlapping theme matches are classified as **Other / Mixed**.
+DeepDine helps restaurants quickly identify recurring strengths, complaints, and improvement areas from customer reviews without manually reading every review.
 
-Reviews are also separated by rating:
+## Workflow
 
-* **Negative:** 1–3 stars
-* **Positive:** 4–5 stars
+```text
+Input restaurant reviews
+→ Clean review data
+→ Generate review embeddings
+→ Classify reviews by theme
+→ Create analysis-ready CSV files
+```
 
-## Sample Finding
+Run the full pipeline with:
 
-During the initial multi-restaurant test, DeepDine analyzed 99 usable reviews for Oishii Poké.
+```bash
+python src/main.py
+```
 
-### Top Positive Recurring Theme
+Or pass a specific CSV file:
 
-Food Quality was the strongest positive recurring theme, appearing in 56 of the restaurant’s 78 positive reviews, or 71.79%. This indicates that customers frequently associate Oishii Poké with favorable food experiences, making food quality the restaurant’s primary recurring strength.
+```bash
+python src/main.py data/input/restaurant_reviews.csv
+```
 
-### Top Negative Recurring Theme
+## Theme Classification
 
-Food Quality was also the most common theme among negative feedback, appearing in 13 of 21 negative reviews, or 61.90%. However, these 13 reviews represent a much smaller portion of the restaurant’s total Food Quality feedback than the 56 positive reviews.
+DeepDine uses SentenceTransformer embeddings to compare each review against predefined theme descriptions.
 
-Overall, the results suggest that food is the primary reason customers discuss Oishii Poké and is generally viewed as a major strength. The smaller group of negative Food Quality reviews can be inspected separately to identify specific concerns involving preparation, taste, temperature, portions, or individual menu items.
+Each review receives:
 
-## Project Direction
+```text
+primary_theme
+secondary_theme
+```
 
-The multi-restaurant Yelp dataset is used for initial testing and validation. DeepDine’s primary goal is to analyze one restaurant at a time using approximately 50–100 or more reviews.
+The primary theme is the strongest match. The secondary theme helps capture reviews that mention more than one topic.
 
-For each restaurant, the system will provide:
+## Current Status
 
-* Recurring strengths and issues
-* Theme counts and percentages
-* Classification confidence scores
-* Representative supporting reviews
-* Evidence-backed improvement recommendations
+The project has been simplified to focus on the core analysis workflow. Extra generated files were removed, and the pipeline now only produces the CSV files needed for review analysis.
 
+## Future Improvements
+
+Possible next steps include dashboard visualizations, automatic recommendations, stronger theme definitions, sentiment summaries by theme, and support for comparing multiple restaurants.
