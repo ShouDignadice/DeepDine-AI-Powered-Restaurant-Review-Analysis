@@ -4,6 +4,7 @@ import argparse
 import classify_reviews
 import clean_restaurant_reviews
 import embed_reviews
+import recommend_restaurant_reviews
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -99,6 +100,8 @@ def main() -> None:
     )
 
     classify_reviews.print_theme_summary(classified_reviews)
+
+    recommend_restaurant_reviews.print_recommendations(classified_reviews)
 
 if __name__ == "__main__":
     main()

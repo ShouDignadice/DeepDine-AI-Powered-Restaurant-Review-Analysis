@@ -19,35 +19,47 @@ MIN_SCORE_MARGIN = 0.03
 
 THEMES = {
     "Food Quality": (
-        "Comments about food taste, freshness, temperature, preparation, "
-        "ingredients, portion size, presentation, or overall food quality."
+        "Comments about the food itself, including taste, flavor, freshness, "
+        "temperature, preparation, ingredients, texture, presentation, portion size, "
+        "or whether the food was cooked properly. This theme focuses on the quality "
+        "of the food, not the price, service, wait time, or restaurant environment."
     ),
     "Service": (
-        "Comments about employee behavior, friendliness, attentiveness, "
-        "professionalism, communication, or customer service."
+        "Comments about staff behavior, friendliness, attentiveness, professionalism, "
+        "communication, helpfulness, attitude, problem resolution, or how employees "
+        "treated the customer. This theme focuses on customer interaction with staff, "
+        "not how long the customer waited."
     ),
     "Wait Time": (
-        "Comments about slow service, long waits, delayed food, seating delays, "
-        "delivery delays, or checkout time."
+        "Comments about long waits, slow service, delayed food, delayed drinks, seating "
+        "delays, pickup delays, delivery delays, checkout delays, or how long the overall "
+        "experience took. This theme focuses on speed and delays, not whether staff were "
+        "friendly or rude."
     ),
     "Cleanliness": (
-        "Comments about dirty tables, bathrooms, dining areas, floors, "
-        "utensils, hygiene, or restaurant cleanliness."
+        "Comments about sanitation, hygiene, dirty tables, sticky surfaces, bathrooms, "
+        "floors, dining areas, utensils, bad smells, pests, trash, or general restaurant "
+        "cleanliness. This theme focuses on cleanliness and hygiene, not decoration, noise, "
+        "or overall atmosphere."
     ),
     "Price and Value": (
-        "Comments about prices, affordability, expensive food, value for money, "
-        "portion value, discounts, or unexpected charges."
+        "Comments about cost, affordability, expensive prices, cheap prices, value for money, "
+        "portion value, discounts, overcharging, unexpected charges, or whether the meal was "
+        "worth the price. This theme focuses on money and perceived value, not food taste alone."
     ),
     "Order Accuracy": (
-        "Comments about incorrect orders, missing items, substitutions, "
-        "delivery mistakes, or ignored special requests."
+        "Comments about incorrect orders, missing items, wrong food, wrong drinks, substitutions, "
+        "ignored special requests, incorrect modifications, missing sides, missing sauces, or "
+        "receiving something different from what was ordered. This theme focuses on whether the "
+        "order was correct, not whether the food tasted good."
     ),
     "Atmosphere": (
-        "Comments about noise, music, seating, decoration, comfort, parking, "
-        "crowding, location, or the restaurant environment."
+        "Comments about the dining environment, including noise level, crowding, seating comfort, "
+        "music, lighting, decoration, layout, temperature, parking, location, space, or overall "
+        "restaurant vibe. This theme focuses on the customer environment, not cleanliness, food, "
+        "service, or wait time."
     ),
 }
-
 
 def validate_data(
     reviews: pd.DataFrame,
@@ -93,7 +105,6 @@ def classify_reviews(
     review_embeddings: np.ndarray,
     model_name: str = MODEL_NAME,
 ) -> pd.DataFrame:
-    """Assign each review to the closest predefined primary and secondary theme."""
 
     validate_data(
         reviews=reviews,
@@ -189,7 +200,6 @@ def classify_reviews(
 
 
 def sort_classified_reviews(reviews: pd.DataFrame) -> pd.DataFrame:
-    """Sort reviews so negative feedback and related themes are easier to inspect."""
 
     group_order = {
         "Negative": 0,
@@ -281,7 +291,6 @@ def save_classification_outputs(
     sorted_output_file: Path = SORTED_THEMED_REVIEWS_FILE,
     final_analysis_file: Path = FINAL_ANALYSIS_FILE,
 ) -> None:
-    """Save only the two classification analysis CSV outputs."""
 
     sorted_output_file.parent.mkdir(
         parents=True,
@@ -299,7 +308,6 @@ def save_classification_outputs(
     )
 
 def print_theme_summary(reviews: pd.DataFrame) -> None:
-    """Print a short terminal summary without creating another CSV."""
 
     print("\nReviews per theme:")
 
