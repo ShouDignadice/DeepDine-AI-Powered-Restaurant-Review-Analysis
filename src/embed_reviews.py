@@ -2,13 +2,10 @@ import numpy as np
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 
-
 MODEL_NAME = "all-MiniLM-L6-v2"
 BATCH_SIZE = 64
 
-
 def validate_reviews(reviews: pd.DataFrame) -> None:
-    """Validate that reviews are ready to be embedded."""
 
     if "text" not in reviews.columns:
         raise ValueError(
@@ -21,13 +18,11 @@ def validate_reviews(reviews: pd.DataFrame) -> None:
             "The cleaned review data does not contain any reviews."
         )
 
-
 def create_review_embeddings(
     reviews: pd.DataFrame,
     model_name: str = MODEL_NAME,
     batch_size: int = BATCH_SIZE,
 ) -> np.ndarray:
-    """Convert review text into normalized sentence embeddings."""
 
     validate_reviews(reviews)
 

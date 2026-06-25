@@ -76,11 +76,10 @@ RECOMMENDATION_RULES = {
 
 
 def validate_reviews(reviews: pd.DataFrame) -> None:
-    """Validate that classified reviews can be used for recommendations."""
 
     required_columns = {
         "primary_theme",
-        "review_group",
+        "aspect_sentiment",
         "stars",
         "text",
     }
@@ -95,43 +94,44 @@ def validate_reviews(reviews: pd.DataFrame) -> None:
 
     if reviews.empty:
         raise ValueError(
-            "Cannot generate recommendations because there are no reviews."
+            "Cannot generate recommendations because there are no review aspects."
         )
 
 
 def create_theme_summary(reviews: pd.DataFrame) -> pd.DataFrame:
-    """Create positive and negative counts for each primary theme."""
 
     theme_summary = pd.crosstab(
         reviews["primary_theme"],
-        reviews["review_group"],
+        reviews["aspect_sentiment"],
     )
 
-    for column in ["Positive", "Negative"]:
+    for column in ["Positive", "Neutral", "Negative"]:
         if column not in theme_summary.columns:
             theme_summary[column] = 0
 
     theme_summary = theme_summary.reset_index()
 
-    theme_summary["total_reviews"] = (
-        theme_summary["Positive"] + theme_summary["Negative"]
+    theme_summary["total_aspects"] = (
+        theme_summary["Positive"]
+        + theme_summary["Neutral"]
+        + theme_summary["Negative"]
     )
 
     theme_summary["negative_percentage"] = (
         theme_summary["Negative"]
-        / theme_summary["total_reviews"]
+        / theme_summary["total_aspects"]
         * 100
     ).round(2)
 
     theme_summary["positive_percentage"] = (
         theme_summary["Positive"]
-        / theme_summary["total_reviews"]
+        / theme_summary["total_aspects"]
         * 100
     ).round(2)
 
     return theme_summary.sort_values(
         by=[
-            "total_reviews",
+            "total_aspects",
             "Negative",
         ],
         ascending=[
@@ -142,7 +142,6 @@ def create_theme_summary(reviews: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_top_strength(theme_summary: pd.DataFrame) -> pd.Series | None:
-    """Find the strongest positive theme."""
 
     positive_themes = theme_summary.loc[
         theme_summary["Positive"] > 0
@@ -155,7 +154,7 @@ def get_top_strength(theme_summary: pd.DataFrame) -> pd.Series | None:
         by=[
             "Positive",
             "positive_percentage",
-            "total_reviews",
+            "total_aspects",
         ],
         ascending=[
             False,
@@ -166,7 +165,6 @@ def get_top_strength(theme_summary: pd.DataFrame) -> pd.Series | None:
 
 
 def get_improvement_areas(theme_summary: pd.DataFrame) -> pd.DataFrame:
-    """Find themes that need improvement based on negative reviews."""
 
     improvement_areas = theme_summary.loc[
         theme_summary["Negative"] > 0
@@ -179,7 +177,7 @@ def get_improvement_areas(theme_summary: pd.DataFrame) -> pd.DataFrame:
         by=[
             "Negative",
             "negative_percentage",
-            "total_reviews",
+            "total_aspects",
         ],
         ascending=[
             False,
@@ -188,15 +186,15 @@ def get_improvement_areas(theme_summary: pd.DataFrame) -> pd.DataFrame:
         ],
     ).head(3)
 
+
 def get_top_negative_review(
     reviews: pd.DataFrame,
     theme: str,
 ) -> pd.Series | None:
-    """Return the strongest negative review row for a given theme."""
 
     theme_reviews = reviews.loc[
         (reviews["primary_theme"] == theme)
-        & (reviews["review_group"] == "Negative")
+        & (reviews["aspect_sentiment"] == "Negative")
     ].copy()
 
     if theme_reviews.empty:
@@ -204,6 +202,10 @@ def get_top_negative_review(
 
     sort_columns = ["stars"]
     ascending_order = [True]
+
+    if "aspect_sentiment_score" in theme_reviews.columns:
+        sort_columns.insert(0, "aspect_sentiment_score")
+        ascending_order.insert(0, False)
 
     if "theme_score" in theme_reviews.columns:
         sort_columns.insert(0, "theme_score")
@@ -214,8 +216,8 @@ def get_top_negative_review(
         ascending=ascending_order,
     ).iloc[0]
 
+
 def print_recommendations(reviews: pd.DataFrame) -> None:
-    """Print automatic recommendations based on classified review patterns."""
 
     validate_reviews(reviews)
 
@@ -231,14 +233,14 @@ def print_recommendations(reviews: pd.DataFrame) -> None:
 
         print(
             f"\nTop strength: {strength_theme} "
-            f"({int(top_strength['Positive'])} positive reviews)"
+            f"({int(top_strength['Positive'])} positive review aspects)"
         )
         print(f"Recommendation: {strength_rule}")
 
     improvement_areas = get_improvement_areas(theme_summary)
 
     if improvement_areas.empty:
-        print("\nNo major improvement areas were found from negative reviews.")
+        print("\nNo major improvement areas were found from negative review aspects.")
         return
 
     print("\nTop improvement areas:")
@@ -249,7 +251,7 @@ def print_recommendations(reviews: pd.DataFrame) -> None:
 
         print(
             f"\n{theme}: "
-            f"{int(row['Negative'])} negative reviews, "
+            f"{int(row['Negative'])} negative review aspects, "
             f"{row['negative_percentage']:.2f}% negative within this theme"
         )
         print(f"Recommendation: {rule}")
@@ -260,10 +262,16 @@ def print_recommendations(reviews: pd.DataFrame) -> None:
         )
 
         if top_review is not None:
-            print("\nExample review theme match:")
+            print("\nExample negative review aspect match:")
             print(f"Primary theme: {top_review['primary_theme']}")
 
             if "secondary_theme" in top_review:
                 print(f"Secondary theme: {top_review['secondary_theme']}")
 
-            print(f"Review: {top_review['text']}")
+            if "aspect_sentiment" in top_review:
+                print(f"Aspect sentiment: {top_review['aspect_sentiment']}")
+
+            print(f"Review aspect: {top_review['text']}")
+
+            if "original_review_text" in top_review:
+                print(f"Original full review: {top_review['original_review_text']}")
